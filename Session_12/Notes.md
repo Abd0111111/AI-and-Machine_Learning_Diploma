@@ -280,3 +280,4 @@ W3Schools
 - SQL أساس أي Backend أو Data Career  
 - فهم Structure و Commands ضروري  
 - ده أساس لأي مستوى متقدم
+- by Manzzzy
