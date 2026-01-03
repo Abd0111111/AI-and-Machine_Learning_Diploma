@@ -10,11 +10,11 @@ import pandas as pd
 # Task 1:
 # Load the CSV file into a DataFrame
 # ------------------------------------------------------------
-df = pd.read_csv("data.csv")
+df = pd.read_csv("../data.csv")
 print("Original DataFrame:")
 print(df)
 
-print("\n" + "="*60 + "\n")
+print("\n" + "="*60 + "\n") #ده بس علشان يعمل سطر فاصل
 
 # ------------------------------------------------------------
 # Task 2:

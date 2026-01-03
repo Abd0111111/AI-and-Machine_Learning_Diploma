@@ -4,7 +4,7 @@
 # that stores temperatures. Print the value of day3.
 # --------------------------------------------
 import pandas as pd
-temps = [22, 25, 23, 26]
-temp_series = pd.Series(temps, index=["day1", "day2", "day3", "day4"])
+temps = [25,28,29,23]
+temp_series = pd.Series(temps,index=['day1','day2','day3','day4'])
 print(temp_series)
-print(temp_series["day3"])
+print(temp_series['day3'])

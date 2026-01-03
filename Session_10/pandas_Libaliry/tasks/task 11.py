@@ -6,3 +6,9 @@
 # 3- Create CalorieLevel column
 # 4- Display info(), describe(), and all High calorie rows
 # --------------------------------------------
+
+import pandas as pd
+data11 = pd.read_csv("../data.csv")
+main = data11['Calories'].main()
+data11.fillna(main, inplace = True)
+print(data11)
