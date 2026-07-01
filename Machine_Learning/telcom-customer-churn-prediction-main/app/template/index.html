@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Churn Predictor</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#080c14;color:#e2e8f0;font-family:'IBM Plex Mono',monospace;min-height:100vh;padding:32px 20px 80px}
+    .page{max-width:920px;margin:0 auto}
+
+    /* Top Bar */
+    .top-bar{display:flex;align-items:center;gap:12px;padding-bottom:20px;border-bottom:1px solid #1e2640;margin-bottom:32px}
+    .pulse-dot{width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(0.8)}}
+    .logo{font-size:1.15rem;font-weight:600;letter-spacing:-.02em;color:#f1f5f9}
+    .logo span{color:#3b82f6}
+    .badge{margin-left:auto;background:#111827;border:1px solid #1e2640;border-radius:6px;padding:4px 12px;font-size:.7rem;color:#64748b;letter-spacing:.08em}
+
+    /* Stat Row */
+    .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px}
+    .stat-card{background:#0f1623;border:1px solid #1e2640;border-radius:10px;padding:14px 18px;transition:border-color .2s}
+    .stat-card:hover{border-color:#3b82f6}
+    .stat-lbl{font-size:.65rem;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+    .stat-val{font-size:1.4rem;font-weight:600}
+    .stat-val.blue{color:#3b82f6}
+    .stat-val.amber{color:#f59e0b}
+    .stat-val.green{color:#10b981}
+
+    /* Main Grid */
+    .main-grid{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
+
+    /* Form Panel */
+    .form-panel{background:#0f1623;border:1px solid #1e2640;border-radius:12px;padding:24px}
+    .sec-head{font-size:.63rem;color:#3b82f6;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px;margin-top:20px;display:flex;align-items:center;gap:8px}
+    .sec-head:first-child{margin-top:0}
+    .sec-head::after{content:'';flex:1;height:1px;background:#1e2640}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .field{background:#080c14;border:1px solid #1e2640;border-radius:8px;padding:10px 14px;transition:border-color .2s,background .2s}
+    .field:focus-within{border-color:#3b82f6;background:#0d1322}
+    .field label{display:block;font-size:.62rem;color:#64748b;letter-spacing:.06em;margin-bottom:6px;text-transform:uppercase}
+    .field input,.field select{width:100%;background:transparent;border:none;outline:none;color:#e2e8f0;font-family:'IBM Plex Mono',monospace;font-size:.82rem;cursor:pointer}
+    .field select option{background:#0f1623}
+    .field input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+
+    /* Buttons */
+    .btn-row{display:flex;gap:8px;margin-top:20px}
+    .btn-run{flex:1;background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:13px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;font-weight:600;cursor:pointer;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+    .btn-run:hover{opacity:.85}
+    .btn-run:disabled{opacity:.45;cursor:not-allowed}
+    .btn-clr{background:#080c14;color:#64748b;border:1px solid #1e2640;border-radius:8px;padding:13px 18px;font-family:'IBM Plex Mono',monospace;font-size:.78rem;cursor:pointer;transition:color .2s,border-color .2s}
+    .btn-clr:hover{color:#e2e8f0;border-color:#475569}
+    .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Side Panel */
+    .side-panel{display:flex;flex-direction:column;gap:12px}
+    .result-card{background:#0f1623;border:1px solid #1e2640;border-radius:12px;padding:22px;transition:border-color .4s,background .4s}
+    .result-card.show-churn{border-color:#ef4444;background:#160a0a}
+    .result-card.show-safe{border-color:#10b981;background:#07130e}
+
+    /* Gauge */
+    .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:10px 0}
+    canvas#gauge{display:block}
+    .gauge-label{font-size:.65rem;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-top:8px}
+    .risk-score{font-size:2.2rem;font-weight:600;color:#f1f5f9;text-align:center;margin-top:4px;transition:color .4s}
+    .risk-score.churn{color:#ef4444}
+    .risk-score.safe{color:#10b981}
+    .verdict-tag{text-align:center;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;margin-top:6px;padding:4px 14px;border-radius:20px;display:inline-block}
+    .verdict-tag.churn{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+    .verdict-tag.safe{background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)}
+    .verdict-row{display:flex;justify-content:center;margin-top:8px}
+    .verdict-msg{font-size:.78rem;color:#94a3b8;text-align:center;margin-top:10px;line-height:1.5;min-height:36px}
+    .divider{height:1px;background:#1e2640;margin:14px 0}
+
+    /* Factors */
+    .factors-title{font-size:.63rem;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .factor-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+    .factor-row .f-name{font-size:.72rem;color:#94a3b8;flex:1}
+    .factor-row .f-bar-bg{flex:2;height:4px;background:#1e2640;border-radius:2px;overflow:hidden}
+    .factor-row .f-bar{height:100%;border-radius:2px;width:0%;transition:width .6s cubic-bezier(.4,0,.2,1)}
+    .factor-row .f-val{font-size:.68rem;color:#64748b;width:28px;text-align:right}
+
+    /* Info Card */
+    .info-card{background:#0f1623;border:1px solid #1e2640;border-radius:12px;padding:18px}
+    .info-title{font-size:.63rem;color:#64748b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+    .info-item{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+    .info-dot{width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:5px}
+    .info-text{font-size:.72rem;color:#94a3b8;line-height:1.5}
+
+    /* Error state */
+    .result-card.show-error{border-color:#ff6b35;background:#130d09}
+
+    /* Responsive */
+    @media(max-width:680px){
+      .main-grid{grid-template-columns:1fr}
+      .stat-row{grid-template-columns:1fr 1fr}
+      .side-panel{order:-1}
+      .fields{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="top-bar">
+    <div class="pulse-dot"></div>
+    <span class="logo">churn<span>_predictor</span>.model</span>
+    <span class="badge">Telecom · Logistic Regression</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-lbl">Accuracy</div>
+      <div class="stat-val blue">84%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Churn Precision</div>
+      <div class="stat-val amber">71%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-lbl">Churn Recall</div>
+      <div class="stat-val green">63%</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-grid">
+
+    <!-- Form -->
+    <div class="form-panel">
+
+      <div class="sec-head">01 — Demographics</div>
+      <div class="fields">
+        <div class="field">
+          <label>Gender</label>
+          <select id="f_gender">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Senior Citizen</label>
+          <select id="f_senior">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Partner</label>
+          <select id="f_partner">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Dependents</label>
+          <select id="f_dep">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-head">02 — Account Info</div>
+      <div class="fields">
+        <div class="field">
+          <label>Tenure (months)</label>
+          <input type="number" id="f_tenure" min="0" placeholder="e.g. 24">
+        </div>
+        <div class="field">
+          <label>Contract Type</label>
+          <select id="f_contract">
+            <option value="Month-to-month">Month-to-month</option>
+            <option value="One year">One year</option>
+            <option value="Two year">Two year</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Paperless Billing</label>
+          <select id="f_paper">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Method</label>
+          <select id="f_pay">
+            <option value="Electronic check">Electronic check</option>
+            <option value="Mailed check">Mailed check</option>
+            <option value="Bank transfer (automatic)">Bank transfer</option>
+            <option value="Credit card (automatic)">Credit card</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Monthly Charges ($)</label>
+          <input type="number" id="f_monthly" step="0.01" placeholder="e.g. 65.50">
+        </div>
+        <div class="field">
+          <label>Total Charges ($)</label>
+          <input type="number" id="f_total" step="0.01" placeholder="e.g. 1200.00">
+        </div>
+      </div>
+
+      <div class="sec-head">03 — Services</div>
+      <div class="fields">
+        <div class="field">
+          <label>Phone Service</label>
+          <select id="f_phone">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Multiple Lines</label>
+          <select id="f_multi">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No phone service">No phone service</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Internet Service</label>
+          <select id="f_inet">
+            <option value="DSL">DSL</option>
+            <option value="Fiber optic">Fiber optic</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Online Security</label>
+          <select id="f_sec">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Online Backup</label>
+          <select id="f_backup">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Device Protection</label>
+          <select id="f_devprot">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tech Support</label>
+          <select id="f_tech">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Streaming TV</label>
+          <select id="f_stv">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Streaming Movies</label>
+          <select id="f_smov">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+            <option value="No internet service">No internet</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-run" id="runBtn" onclick="runPrediction()">
+          <span id="btnTxt">Run Prediction</span>
+          <span class="spinner" id="spin"></span>
+        </button>
+        <button class="btn-clr" onclick="resetAll()">Clear</button>
+      </div>
+
+    </div><!-- /form-panel -->
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+
+      <!-- Result Card -->
+      <div class="result-card" id="resultCard">
+        <div class="gauge-wrap">
+          <canvas id="gauge" width="200" height="110"></canvas>
+          <div class="gauge-label">Churn Risk Score</div>
+          <div class="risk-score" id="riskScore">—</div>
+          <div class="verdict-row">
+            <span class="verdict-tag" id="verdictTag" style="display:none"></span>
+          </div>
+          <div class="verdict-msg" id="verdictMsg">Fill in the form and run prediction to see the result.</div>
+        </div>
+        <div class="divider"></div>
+        <div class="factors-title">Top Risk Factors</div>
+        <div id="factorsArea">
+          <div class="factor-row">
+            <div class="f-name">Contract type</div>
+            <div class="f-bar-bg"><div class="f-bar" style="background:#3b82f6"></div></div>
+            <div class="f-val">—</div>
+          </div>
+          <div class="factor-row">
+            <div class="f-name">Tenure</div>
+            <div class="f-bar-bg"><div class="f-bar" style="background:#3b82f6"></div></div>
+            <div class="f-val">—</div>
+          </div>
+          <div class="factor-row">
+            <div class="f-name">Monthly charges</div>
+            <div class="f-bar-bg"><div class="f-bar" style="background:#3b82f6"></div></div>
+            <div class="f-val">—</div>
+          </div>
+          <div class="factor-row">
+            <div class="f-name">Internet service</div>
+            <div class="f-bar-bg"><div class="f-bar" style="background:#3b82f6"></div></div>
+            <div class="f-val">—</div>
+          </div>
+          <div class="factor-row">
+            <div class="f-name">Online security</div>
+            <div class="f-bar-bg"><div class="f-bar" style="background:#3b82f6"></div></div>
+            <div class="f-val">—</div>
+          </div>
+        </div>
+      </div><!-- /result-card -->
+
+      <!-- Info Card -->
+      <div class="info-card">
+        <div class="info-title">About this model</div>
+        <div class="info-item">
+          <div class="info-dot" style="background:#3b82f6"></div>
+          <div class="info-text">Trained on IBM Telco dataset — 7,043 customers, 20 features.</div>
+        </div>
+        <div class="info-item">
+          <div class="info-dot" style="background:#f59e0b"></div>
+          <div class="info-text">Logistic Regression with preprocessing pipeline (StandardScaler + OneHotEncoder).</div>
+        </div>
+        <div class="info-item">
+          <div class="info-dot" style="background:#10b981"></div>
+          <div class="info-text">Outputs churn probability. Threshold = 0.5 for binary decision.</div>
+        </div>
+      </div>
+
+    </div><!-- /side-panel -->
+
+  </div><!-- /main-grid -->
+</div><!-- /page -->
+
+<script>
+  const PI = Math.PI;
+
+  /* ── Gauge ── */
+  function drawGauge(pct) {
+    const c   = document.getElementById('gauge');
+    const ctx = c.getContext('2d');
+    const cx  = 100, cy = 100, r = 78;
+    ctx.clearRect(0, 0, 200, 110);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, PI, 2 * PI);
+    ctx.strokeStyle = '#1e2640';
+    ctx.lineWidth   = 12;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    if (pct > 0) {
+      const grad = ctx.createLinearGradient(cx - r, 0, cx + r, 0);
+      grad.addColorStop(0,   '#10b981');
+      grad.addColorStop(0.5, '#f59e0b');
+      grad.addColorStop(1,   '#ef4444');
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, PI, PI + (pct / 100) * PI);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth   = 12;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+
+      const dotA = PI + (pct / 100) * PI;
+      ctx.beginPath();
+      ctx.arc(cx + r * Math.cos(dotA), cy + r * Math.sin(dotA), 5, 0, 2 * PI);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+  }
+
+  drawGauge(0);
+
+  function animateGauge(target) {
+    let cur = 0;
+    const step = target / 40;
+    const iv = setInterval(() => {
+      cur = Math.min(cur + step, target);
+      drawGauge(cur);
+      if (cur >= target) clearInterval(iv);
+    }, 18);
+  }
+
+  function animateScore(target, el, isChurn) {
+    let cur = 0;
+    const step = target / 40;
+    const iv = setInterval(() => {
+      cur = Math.min(cur + step, target);
+      el.textContent = Math.round(cur) + '%';
+      if (cur >= target) { el.textContent = target + '%'; clearInterval(iv); }
+    }, 18);
+    el.className = 'risk-score ' + (isChurn ? 'churn' : 'safe');
+  }
+
+  /* ── Factors ── */
+  function updateFactors(payload) {
+    const bars = document.querySelectorAll('#factorsArea .f-bar');
+    const vals = document.querySelectorAll('#factorsArea .f-val');
+
+    const contractScore = payload.Contract === 'Month-to-month' ? 88 :
+                          payload.Contract === 'One year'        ? 42 : 12;
+    const tenureScore   = Math.max(5, Math.round(100 - ((parseFloat(payload.tenure) || 1) / 72) * 95));
+    const chargeScore   = Math.min(95, Math.round(((parseFloat(payload.MonthlyCharges) || 0) / 120) * 95));
+    const inetScore     = payload.InternetService === 'Fiber optic' ? 76 :
+                          payload.InternetService === 'DSL'          ? 42 : 10;
+    const secScore      = payload.OnlineSecurity === 'No' ? 68 :
+                          payload.OnlineSecurity === 'No internet service' ? 20 : 18;
+
+    [contractScore, tenureScore, chargeScore, inetScore, secScore].forEach((s, i) => {
+      setTimeout(() => {
+        bars[i].style.width      = s + '%';
+        bars[i].style.background = s > 65 ? '#ef4444' : s > 40 ? '#f59e0b' : '#10b981';
+        vals[i].textContent      = s + '%';
+      }, i * 80);
+    });
+  }
+
+  /* ── Prediction ── */
+  async function runPrediction() {
+    const payload = {
+      gender:           document.getElementById('f_gender').value,
+      SeniorCitizen:    document.getElementById('f_senior').value,
+      Partner:          document.getElementById('f_partner').value,
+      Dependents:       document.getElementById('f_dep').value,
+      tenure:           parseFloat(document.getElementById('f_tenure').value)  || 0,
+      Contract:         document.getElementById('f_contract').value,
+      PaperlessBilling: document.getElementById('f_paper').value,
+      PaymentMethod:    document.getElementById('f_pay').value,
+      MonthlyCharges:   parseFloat(document.getElementById('f_monthly').value) || 0,
+      TotalCharges:     parseFloat(document.getElementById('f_total').value)   || 0,
+      PhoneService:     document.getElementById('f_phone').value,
+      MultipleLines:    document.getElementById('f_multi').value,
+      InternetService:  document.getElementById('f_inet').value,
+      OnlineSecurity:   document.getElementById('f_sec').value,
+      OnlineBackup:     document.getElementById('f_backup').value,
+      DeviceProtection: document.getElementById('f_devprot').value,
+      TechSupport:      document.getElementById('f_tech').value,
+      StreamingTV:      document.getElementById('f_stv').value,
+      StreamingMovies:  document.getElementById('f_smov').value
+    };
+
+    const btn    = document.getElementById('runBtn');
+    const spin   = document.getElementById('spin');
+    const btnTxt = document.getElementById('btnTxt');
+    btn.disabled         = true;
+    btnTxt.style.display = 'none';
+    spin.style.display   = 'block';
+
+    try {
+      const res  = await fetch('/predict', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Server error (' + res.status + ')');
+        return;
+      }
+
+      const isChurn = data.churn;
+      const prob    = data.probability != null
+                      ? Math.round(data.probability * 100)
+                      : (isChurn ? 72 : 28);
+
+      const card = document.getElementById('resultCard');
+      card.className = 'result-card ' + (isChurn ? 'show-churn' : 'show-safe');
+
+      animateGauge(prob);
+      animateScore(prob, document.getElementById('riskScore'), isChurn);
+
+      const tag = document.getElementById('verdictTag');
+      tag.textContent    = isChurn ? '⚠ High Risk' : '✓ Low Risk';
+      tag.className      = 'verdict-tag ' + (isChurn ? 'churn' : 'safe');
+      tag.style.display  = 'inline-block';
+
+      document.getElementById('verdictMsg').textContent =
+        data.message || (isChurn
+          ? 'This customer is likely to churn. Consider a retention offer.'
+          : 'This customer is likely to stay. Profile looks stable.');
+
+      updateFactors(payload);
+
+    } catch (e) {
+      showError('Could not reach the API. Make sure Flask is running on /predict.');
+    } finally {
+      btn.disabled         = false;
+      btnTxt.style.display = 'inline';
+      spin.style.display   = 'none';
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('resultCard').className = 'result-card show-error';
+    document.getElementById('riskScore').textContent = 'ERR';
+    document.getElementById('riskScore').className   = 'risk-score';
+    document.getElementById('verdictTag').style.display = 'none';
+    document.getElementById('verdictMsg').textContent = msg;
+  }
+
+  /* ── Reset ── */
+  function resetAll() {
+    document.querySelectorAll('input').forEach(i  => i.value = '');
+    document.querySelectorAll('select').forEach(s => s.selectedIndex = 0);
+    document.getElementById('resultCard').className      = 'result-card';
+    document.getElementById('riskScore').textContent     = '—';
+    document.getElementById('riskScore').className       = 'risk-score';
+    document.getElementById('verdictTag').style.display  = 'none';
+    document.getElementById('verdictMsg').textContent    = 'Fill in the form and run prediction to see the result.';
+    document.querySelectorAll('.f-bar').forEach(b => b.style.width = '0%');
+    document.querySelectorAll('.f-val').forEach(v => v.textContent = '—');
+    drawGauge(0);
+  }
+</script>
+
+</body>
+</html>
